@@ -92,7 +92,7 @@ def read_callback():
     info = get_rabbitmqctl_queue_status()
 
     # Send keys to collectd
-    for key, value in info:
+    for key, value in info.iteritems():
         log('verb', 'Sent value: %s %i' % (key, value))
         value = collectd.Values(plugin=NAME)
         value.type = 'gauge'
