@@ -19,70 +19,49 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>
 
 """
+
 import collectd
 import urllib2
 import json
+
 
 NAME = 'rabbitmq'
 HOST = 'localhost'
 PORT = '15672'
 USER = 'guest'
 PASS = 'guest'
-VERBOSE = True
+VHOST = urllib2.quote('/', safe='')
+VERBOSE = False
+QUEUE = None
 
-# Get all statistics with rabbitmqctl
-def get_rabbitmqctl_status():
+
+def get_rabbitmqctl_queue_status():
+    """Get all statistics with rabbitmq-manager api"""
     stats = {}
 
-    url_overview = 'http://%s:%s/api/overview' %(HOST, PORT)
+    url_overview = 'http://%s:%s/api/queues/%s/%s' % (HOST, PORT, VHOST, QUEUE)
     passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
     passman.add_password(None, url_overview, USER, PASS)
     authhandler = urllib2.HTTPBasicAuthHandler(passman)
     opener = urllib2.build_opener(authhandler)
     urllib2.install_opener(opener)
-    overview = json.load(urllib2.urlopen(url_overview))
+    queue_overview = json.load(urllib2.urlopen(url_overview))
 
-    url_nodes = 'http://%s:%s/api/nodes' %(HOST, PORT)
-    passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-    passman.add_password(None, url_nodes, USER, PASS)
-    authhandler = urllib2.HTTPBasicAuthHandler(passman)
-    opener = urllib2.build_opener(authhandler)
-    urllib2.install_opener(opener)
-    nodes = json.load(urllib2.urlopen(url_nodes))
-
-    # Message Stats
-    stats['ack_rate'] = int(overview['message_stats']['ack_details']['rate'])
-    stats['deliver_rate'] = int(overview['message_stats']['deliver_details']['rate'])
-    stats['publish_rate'] = int(overview['message_stats']['publish_details']['rate'])
-
-    # Queue Totals
-    stats['messages_total'] = int(overview['queue_totals']['messages'])
-    stats['messages_ready'] = int(overview['queue_totals']['messages_ready'])
-    stats['messages_unack'] = int(overview['queue_totals']['messages_unacknowledged'])
-
-    # Object Totals
-    stats['channels'] = int(overview['object_totals']['channels'])
-    stats['connections'] = int(overview['object_totals']['connections'])
-    stats['consumers'] = int(overview['object_totals']['consumers'])
-    stats['exchanges'] = int(overview['object_totals']['exchanges'])
-    stats['queues'] = int(overview['object_totals']['queues'])
-
-    # Node Stats
-    stats['fd_total'] = int(nodes[0]['fd_total'])
-    stats['fd_used'] = int(nodes[0]['fd_used'])
-    stats['mem_limit'] = int(nodes[0]['mem_limit'])
-    stats['mem_used'] = int(nodes[0]['mem_used'])
-    stats['sockets_total'] = int(nodes[0]['sockets_total'])
-    stats['sockets_used'] = int(nodes[0]['sockets_used'])
-    stats['proc_total'] = int(nodes[0]['proc_total'])
-    stats['proc_used'] = int(nodes[0]['proc_used'])
+    # queue stats
+    stats['messages'] = int(queue_overview['messages'])
+    stats['messages_unacknowledged'] = int(queue_overview['messages_unacknowledged'])
+    stats['messages_ready'] = int(queue_overview['messages_ready'])
+    stats['consumers'] = int(queue_overview['messages_ready'])
+    stats['deliver_rate'] = int(queue_overview['message_stats']['deliver_details']['rate'])
+    stats['publish_rate'] = int(queue_overview['message_stats']['publish_details']['rate'])
 
     return stats
 
-# Config data from collectd
+
 def configure_callback(conf):
+    """Config data from collectd"""
     log('verb', 'configure_callback Running')
-    global NAME, HOST, PORT, USER, PASS, VERBOSE
+    global NAME, HOST, PORT, VHOST, QUEUE, USER, PASS, VERBOSE
     for node in conf.children:
         if node.key == 'Name':
             NAME = node.values[0]
@@ -96,37 +75,46 @@ def configure_callback(conf):
             PASS = node.values[0]
         elif node.key == 'Verbose':
             VERBOSE = node.values[0]
+        elif node.key == 'Vhost':
+            VHOST = urllib2.quote(node.values[0], safe="")
+        elif node.key == 'Queue':
+            QUEUE = urllib2.quote(node.values[0], safe="")
         else:
-            log('warn', 'Unknown config key: %s' %node.key)
+            log('warn', 'Unknown config key: %s' % node.key)
+    
+    if QUEUE is None:
+        log('err', 'Queue parameter is mandatory')
 
-# Send rabbitmq stats to collectd
+
 def read_callback():
+    """Send rabbitmq stats to collectd"""
     log('verb', 'read_callback Running')
-    info = get_rabbitmqctl_status()
+    info = get_rabbitmqctl_queue_status()
 
     # Send keys to collectd
-    for key in info:
-        log('verb', 'Sent value: %s %i' %(key, info[key]))
+    for key, value in info:
+        log('verb', 'Sent value: %s %i' % (key, value))
         value = collectd.Values(plugin=NAME)
         value.type = 'gauge'
         value.type_instance = key
-        value.values = [int(info[key])]
+        value.values = [int(value)]
         value.dispatch()
 
-# Log messages to collect logger
+
 def log(t, message):
+    """Log messages to collect logger"""
     if t == 'err':
-        collectd.error('%s: %s' %(NAME, message))
+        collectd.error('%s: %s' % (NAME, message))
     elif t == 'warn':
-        collectd.warning('%s: %s' %(NAME, message))
+        collectd.warning('%s: %s' % (NAME, message))
     elif t == 'verb':
         if VERBOSE == True:
-            collectd.info('%s: %s' %(NAME, message))
+            collectd.info('%s: %s' % (NAME, message))
     else:
-        collectd.info('%s: %s' %(NAME, message))
+        collectd.info('%s: %s' % (NAME, message))
+
 
 # Register to collectd
 collectd.register_config(configure_callback)
-collectd.warning('Initialising %s' %NAME)
+collectd.warning('Initialising %s' % NAME)
 collectd.register_read(read_callback)
-
