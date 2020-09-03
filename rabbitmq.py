@@ -48,12 +48,12 @@ def get_rabbitmqctl_queue_status():
     queue_overview = json.load(urllib2.urlopen(url_overview))
 
     # queue stats
-    stats['messages'] = int(queue_overview['messages'])
-    stats['messages_unacknowledged'] = int(queue_overview['messages_unacknowledged'])
-    stats['messages_ready'] = int(queue_overview['messages_ready'])
-    stats['consumers'] = int(queue_overview['messages_ready'])
-    stats['deliver_rate'] = int(queue_overview['message_stats']['deliver_details']['rate'])
-    stats['publish_rate'] = int(queue_overview['message_stats']['publish_details']['rate'])
+    stats['messages'] = queue_overview['messages']
+    stats['messages_unacknowledged'] = queue_overview['messages_unacknowledged']
+    stats['messages_ready'] = queue_overview['messages_ready']
+    stats['consumers'] = queue_overview['messages_ready']
+    #stats['deliver_rate'] = queue_overview['message_stats']['deliver_details']['rate']
+    #stats['publish_rate'] = queue_overview['message_stats']['publish_details']['rate']
 
     return stats
 
