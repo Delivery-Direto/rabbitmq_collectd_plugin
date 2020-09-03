@@ -1,0 +1,6 @@
+rabbitmq_messages                 value:GAUGE:0:U
+rabbitmq_messages_unacknowledged  value:GAUGE:0:U
+rabbitmq_messages_ready           value:GAUGE:0:U
+rabbitmq_consumers                value:GAUGE:0:U
+rabbitmq_deliver_rate             value:GAUGE:0:U
+rabbitmq_publish_rate             value:GAUGE:0:U

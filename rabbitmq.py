@@ -91,14 +91,19 @@ def read_callback():
     log('verb', 'read_callback Running')
     info = get_rabbitmqctl_queue_status()
 
-    # Send keys to collectd
-    for key, val in info.iteritems():
-        log('verb', 'Sent value: %s %i' % (key, val))
-        value = collectd.Values(plugin=NAME)
-        value.type = 'gauge'
-        value.type_instance = key
-        value.values = [int(val)]
-        value.dispatch()
+    try:
+        # Send keys to collectd
+        for key, val in info.iteritems():
+            log('verb', 'Sent value: %s %i' % (key, val))
+            value = collectd.Values(plugin=NAME)
+            value.host = VHOST
+            value.plugin_instance = QUEUE
+            value.type = 'rabbitmq_%s' % key
+            value.type_instance = key
+            value.values = [int(val)]
+            value.dispatch()
+    except Excetion as ex:
+        log('warn', "Failed to dispatch. Exception %s" % ex)
 
 
 def log(t, message):
